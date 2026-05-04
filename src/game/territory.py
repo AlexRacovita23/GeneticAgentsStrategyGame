@@ -5,17 +5,18 @@ from dataclasses import dataclass
 class Territory:
     owner: int = -1
     troops: int = 0
+    is_blocked: bool = False
     
     @property
     def is_neutral(self) -> bool:
-        return self.owner == -1
+        return self.owner == -1 and not self.is_blocked
     
     @property
     def available_troops(self) -> int:
         return max(0, self.troops - 1)
     
     def can_move_from(self) -> bool:
-        return self.owner != -1 and self.available_troops > 0
+        return not self.is_blocked and self.owner != -1 and self.available_troops > 0
     
     def remove_troops(self, count: int) -> int:
         to_remove = min(count, self.available_troops)
@@ -30,5 +31,7 @@ class Territory:
         self.troops = troops
     
     def __repr__(self) -> str:
+        if self.is_blocked:
+            return "Territory(BLOCKED)"
         owner_str = "N" if self.is_neutral else str(self.owner)
         return f"Territory({owner_str}:{self.troops})"

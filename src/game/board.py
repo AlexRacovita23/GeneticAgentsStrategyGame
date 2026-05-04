@@ -43,8 +43,10 @@ class Board:
         for dr, dc in directions:
             new_row, new_col = row + dr, col + dc
             if self.is_valid(new_row, new_col):
-                neighbors.append((new_row, new_col))
-        
+                territory = self.grid[new_row][new_col]
+                if not territory.is_blocked:
+                    neighbors.append((new_row, new_col))
+
         return neighbors
     
     def are_adjacent(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> bool:
@@ -85,6 +87,9 @@ class Board:
         source = self.grid[from_row][from_col]
         dest = self.grid[to_row][to_col]
         
+        if source.is_blocked or dest.is_blocked:
+            return MoveOutcome(result=MoveResult.INVALID)
+
         if source.owner == -1:
             return MoveOutcome(result=MoveResult.INVALID)
         
@@ -137,6 +142,11 @@ class Board:
     def __repr__(self) -> str:
         lines = []
         for row in self.grid:
-            cells = [f"{t.owner if t.owner != -1 else 'N'}:{t.troops:2d}" for t in row]
+            cells = []
+            for t in row:
+                if t.is_blocked:
+                    cells.append("  WALL  ")
+                else:
+                    cells.append(f"{t.owner if t.owner != -1 else 'N'}:{t.troops:2d}")
             lines.append(" | ".join(cells))
         return "\n".join(lines)
