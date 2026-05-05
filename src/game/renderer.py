@@ -24,6 +24,7 @@ class RenderConfig:
     )
     neutral_color: Tuple[int, int, int] = (128, 128, 128)
     empty_color: Tuple[int, int, int] = (50, 50, 50)
+    blocked_color: Tuple[int, int, int] = (100, 100, 100)
     grid_color: Tuple[int, int, int] = (200, 200, 200)
     highlight_color: Tuple[int, int, int] = (255, 255, 0)
     text_color: Tuple[int, int, int] = (255, 255, 255)
@@ -168,7 +169,7 @@ class PygameRenderer(BaseRenderer):
         self.help_bar_height = 60
         
         board_size = game.board.size
-        initial_cell_size = self.config.cell_size
+        initial_cell_size = min(60, self.config.cell_size)
         initial_board_pixels = board_size * initial_cell_size
         self.width = initial_board_pixels + 2 * self.config.margin + self.info_panel_width
         self.height = initial_board_pixels + 2 * self.config.margin + self.help_bar_height
@@ -268,9 +269,12 @@ class PygameRenderer(BaseRenderer):
     def _draw_cell(self, row: int, col: int) -> None:
         territory = self.game.board.get(row, col)
         rect = self._get_cell_rect(row, col)
-        
+
         if territory.owner == -1 and territory.troops == 0:
-            color = self.config.empty_color
+            if territory.is_blocked:
+                color = self.config.blocked_color
+            else:
+                color = self.config.empty_color
         else:
             color = self._get_player_color(territory.owner)
         

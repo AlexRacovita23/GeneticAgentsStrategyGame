@@ -103,6 +103,7 @@ class Board:
         
         if dest.owner == source.owner:
             dest.add_troops(troops_moved)
+            dest.troops_moved_this_turn += troops_moved
             return MoveOutcome(
                 result=MoveResult.REINFORCED,
                 troops_moved=troops_moved,
@@ -124,6 +125,7 @@ class Board:
         if attackers > defenders:
             remaining = attackers - defenders
             dest.set_owner(source.owner, remaining)
+            dest.troops_moved_this_turn = remaining
             return MoveOutcome(
                 result=MoveResult.CONQUERED,
                 troops_moved=attackers,

@@ -58,6 +58,7 @@ def resolve_combat_lanchester(
     
     if defenders <= 0:
         dest.set_owner(source.owner, attackers)
+        dest.troops_moved_this_turn = attackers
         return MoveOutcome(
             result=MoveResult.CONQUERED,
             troops_moved=attackers,
@@ -78,6 +79,7 @@ def resolve_combat_lanchester(
         troops_lost_attacker = attackers - remaining
         
         dest.set_owner(source.owner, remaining)
+        dest.troops_moved_this_turn = remaining
         
         return MoveOutcome(
             result=MoveResult.CONQUERED,
@@ -143,6 +145,7 @@ def resolve_flanked_combat(
     
     if defenders <= 0:
         dest.set_owner(attacker_owner, total_attackers)
+        dest.troops_moved_this_turn = total_attackers
         return FlankingOutcome(
             result=MoveResult.CONQUERED,
             attacker_wins=True,
@@ -171,6 +174,7 @@ def resolve_flanked_combat(
         losses_per_source = _distribute_losses(attacks, troops_lost)
         
         dest.set_owner(attacker_owner, remaining)
+        dest.troops_moved_this_turn = remaining
         
         return FlankingOutcome(
             result=MoveResult.CONQUERED,

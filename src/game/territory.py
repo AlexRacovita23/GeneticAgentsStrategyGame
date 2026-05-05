@@ -6,6 +6,7 @@ class Territory:
     owner: int = -1
     troops: int = 0
     is_blocked: bool = False
+    troops_moved_this_turn: int = 0
     
     @property
     def is_neutral(self) -> bool:
@@ -13,7 +14,7 @@ class Territory:
     
     @property
     def available_troops(self) -> int:
-        return max(0, self.troops - 1)
+        return max(0, self.troops - 1 - self.troops_moved_this_turn)
     
     def can_move_from(self) -> bool:
         return not self.is_blocked and self.owner != -1 and self.available_troops > 0

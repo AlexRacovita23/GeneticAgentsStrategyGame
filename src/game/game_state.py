@@ -307,6 +307,10 @@ class GameState:
         if self.phase == GamePhase.GAME_OVER:
             return
         
+        for row in range(self.config.board_size):
+            for col in range(self.config.board_size):
+                self.board.grid[row][col].troops_moved_this_turn = 0
+
         start_index = self.current_player_index
         while True:
             self.current_player_index = (self.current_player_index + 1) % len(self.players)
@@ -444,6 +448,8 @@ class GameState:
                 new_state.board.grid[row][col] = Territory(
                     owner=orig.owner,
                     troops=orig.troops,
+                    is_blocked=orig.is_blocked,
+                    troops_moved_this_turn=orig.troops_moved_this_turn,
                 )
         
         new_state.players = [
