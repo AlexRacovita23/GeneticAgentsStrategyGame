@@ -47,10 +47,7 @@ class Population:
         ]
         self.generation = 0
     
-    def evaluate_population(self, verbose: bool = True) -> None:
-        if verbose:
-            print(f"\nEvaluating Generation {self.generation}...")
-        
+    def evaluate_population(self, verbose: bool = True) -> None:        
         for i, individual in enumerate(self.population):
             if verbose and (i + 1) % 10 == 0:
                 print(f"  Evaluated {i + 1}/{self.population_size} individuals")
@@ -68,10 +65,8 @@ class Population:
             
             individual.fitness = self.evaluator.evaluate_games(game_results)
         
-        # Sort by fitness
         self.population.sort(key=lambda ind: ind.fitness.score, reverse=True)
         
-        # Update best individual
         if self.best_individual is None or \
            self.population[0].fitness.score > self.best_individual.fitness.score:
             self.best_individual = Individual(

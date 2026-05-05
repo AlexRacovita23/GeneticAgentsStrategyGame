@@ -6,8 +6,6 @@ from pathlib import Path
 from datetime import datetime
 
 from src.genetic.population import Population
-from src.genetic.board_setup import visualize_chokepoint_board
-
 
 class TrainingLogger:
 
@@ -42,22 +40,16 @@ def train(generations: int = 100,
     logger = TrainingLogger(log_file)
     sys.stdout = logger
 
-    print("=" * 80)
-    print("GENETIC ALGORITHM TRAINING")
-    print("=" * 80)
     print(f"\nTraining Session: {timestamp}")
     print(f"Output Directory: {session_dir}")
     print(f"\nConfiguration:")
-    print(f"  Generations: {generations}")
-    print(f"  Population Size: {population_size}")
-    print(f"  Games per Evaluation: {games_per_eval}")
-    print(f"  Save Every: {save_every} generations")
+    print(f"Generations: {generations}")
+    print(f"Population Size: {population_size}")
+    print(f"Games per Evaluation: {games_per_eval}")
+    print(f"Save Every: {save_every} generations\n")
     if seed:
         print(f"  Random Seed: {seed}")
 
-    print("\n" + visualize_chokepoint_board())
-
-    print("\nInitializing population...")
     population = Population(
         population_size=population_size,
         games_per_eval=games_per_eval,
@@ -73,19 +65,17 @@ def train(generations: int = 100,
     for gen in range(generations):
         gen_start = time.time()
 
-        print(f"\n{'=' * 80}")
         print(f"GENERATION {gen + 1}/{generations}")
-        print(f"{'=' * 80}")
 
         population.evaluate_population(verbose=True)
 
         stats = population.get_statistics()
 
         print(f"\nStatistics:")
-        print(f"  Best Score: {stats['best_score']:.2f}")
-        print(f"  Average Score: {stats['avg_score']:.2f}")
-        print(f"  Worst Score: {stats['worst_score']:.2f}")
-        print(f"  Total Wins: {stats['total_wins']}")
+        print(f"Best Score: {stats['best_score']:.2f}")
+        print(f"Average Score: {stats['avg_score']:.2f}")
+        print(f"Worst Score: {stats['worst_score']:.2f}")
+        print(f"Total Wins: {stats['total_wins']}")
 
         if population.best_individual:
             print(f"\nBest Individual:")
@@ -107,9 +97,6 @@ def train(generations: int = 100,
 
     total_time = time.time() - start_time
 
-    print("\n" + "=" * 80)
-    print("TRAINING COMPLETE")
-    print("=" * 80)
     print(f"\nTotal training time: {total_time:.2f}s ({total_time/60:.2f} minutes)")
     print(f"Final best score: {population.best_individual.fitness.score:.2f}")
     print(f"Final best genome saved to: {final_path}")

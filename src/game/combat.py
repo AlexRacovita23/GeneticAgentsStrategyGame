@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass, field
-from typing import Callable, List, Tuple, Optional
+from typing import Callable, List, Tuple
 
 from src.game.territory import Territory
 from src.game.board import MoveOutcome, MoveResult
@@ -308,40 +308,3 @@ def minimum_troops_to_win(
     effective_ratio = defender_bonus / flanking_bonus
     min_attackers = defenders * math.sqrt(effective_ratio)
     return int(math.ceil(min_attackers)) + 1
-
-
-def print_combat_table(max_troops: int = 20, defender_bonus: float = 1.2) -> None:
-    print(f"\nLanchester Combat Table (defender bonus: {defender_bonus}x)")
-    print("=" * 70)
-    
-    print("\n1. SINGLE DIRECTION ATTACK (no flanking bonus)")
-    print("-" * 70)
-    print(f"{'Attackers':>10} vs {'Defenders':>10} -> {'Winner':>10} {'Remaining':>10}")
-    print("-" * 70)
-    
-    test_cases = [(10, 10), (12, 10), (15, 10), (20, 15)]
-    for atk, def_ in test_cases:
-        wins, remaining = calculate_remaining_troops(atk, def_, defender_bonus, flanking_directions=1)
-        winner = "Attacker" if wins else "Defender"
-        print(f"{atk:>10} vs {def_:>10} -> {winner:>10} {remaining:>10}")
-    
-    print("\n2. FLANKING COMPARISON (15 attackers vs 12 defenders)")
-    print("-" * 70)
-    print(f"{'Directions':>10} {'Bonus':>10} -> {'Winner':>10} {'Remaining':>10}")
-    print("-" * 70)
-    
-    config = CombatConfig(defender_bonus=defender_bonus)
-    for dirs in [1, 2, 3, 4]:
-        bonus = get_flanking_bonus(dirs, config)
-        wins, remaining = calculate_remaining_troops(15, 12, defender_bonus, flanking_directions=dirs)
-        winner = "Attacker" if wins else "Defender"
-        print(f"{dirs:>10} {bonus:>10.2f}x -> {winner:>10} {remaining:>10}")
-    
-    print("\n3. MINIMUM TROOPS TO WIN vs 10 DEFENDERS")
-    print("-" * 70)
-    for dirs in [1, 2, 3, 4]:
-        min_troops = minimum_troops_to_win(10, defender_bonus, flanking_directions=dirs)
-        bonus = get_flanking_bonus(dirs, config)
-        print(f"   {dirs} direction(s) ({bonus:.2f}x bonus): need {min_troops} attackers")
-    
-    print()

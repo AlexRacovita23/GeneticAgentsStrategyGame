@@ -40,24 +40,3 @@ def create_chokepoint_game(starting_troops: int = 15,
     setup_chokepoint_board(game_state, starting_troops)
     
     return game_state
-
-
-def visualize_chokepoint_board() -> str:
-    lines = ["Chokepoint Board Layout (16x16):"]
-    lines.append("=" * 80)
-    lines.append("")
-    lines.append("Columns: 0  1  2 | 3 | 4  5  6  7  8  9 10 11 | 12 | 13 14 15")
-    lines.append("         LEFT    |W|        CENTER          |W |      RIGHT")
-    lines.append("")
-    lines.append("Rows 0-3:   Accessible (P0 starts at 0,0)")
-    lines.append("Rows 4-11:  WALLS at columns 3 and 12")
-    lines.append("Rows 12-15: Accessible (P1 starts at 15,15)")
-    lines.append("")
-    lines.append("Strategic points:")
-    lines.append("  - Chokepoint entrances: rows 3, 12 at columns 3 and 12")
-    lines.append("  - Left flank: columns 0-2")
-    lines.append("  - Center: columns 4-11")
-    lines.append("  - Right flank: columns 13-15")
-    lines.append("=" * 80)
-    
-    return "\n".join(lines)
