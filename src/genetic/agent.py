@@ -1,9 +1,9 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 import random
 
 from src.game.game_state import GameState, GamePhase
 from src.game.board import MoveResult
-from src.game.combat import calculate_win_probability, minimum_troops_to_win
+from src.game.combat import minimum_troops_to_win
 from src.genetic.genome import Genome
 
 
@@ -40,68 +40,47 @@ class GeneticAgent:
         
         border_territories = self._get_border_territories(game_state, territories)
         
-        if reinforcement_spread > 0.7:
-            self._spread_reinforcements(game_state, territories, border_territories, 
-                                       border_focus, reinforcements)
-        elif concentration > 0.6:
-            self._concentrate_reinforcements(game_state, border_territories, 
-                                            reinforcements)
+        weights = {}
+        for pos in territories:
+            is_border = pos in border_territories
+            troops = game_state.board.get(pos[0], pos[1]).troops
+
+            base_weight = border_focus if is_border else (1.0 - border_focus)
+
+            if troops > 0:
+                strength_weight = (troops * reinforcement_spread +
+                                 (1.0 / troops) * (1.0 - reinforcement_spread))
+            else:
+                strength_weight = 1.0
+
+            weights[pos] = base_weight * strength_weight
+        
+        sharpness = 1.0 + concentration * 4.0
+        sharpened = {pos: w ** sharpness for pos, w in weights.items()}
+
+        total_weight = sum(sharpened.values())
+        if total_weight == 0:
+            distribution = {pos: 1.0 / len(territories) for pos in territories}
         else:
-            self._balanced_reinforcements(game_state, territories, border_territories,
-                                         border_focus, reinforcements)
-    
-    def _spread_reinforcements(self, game_state: GameState, territories: List[Tuple[int, int]],
-                               border_territories: List[Tuple[int, int]], border_focus: float,
-                               reinforcements: int) -> None:
-        targets = border_territories if border_focus > 0.5 else territories
+            distribution = {pos: w / total_weight for pos, w in sharpened.items()}
         
-        if not targets:
-            targets = territories
+        allocated = {}
+        remaining = reinforcements
         
-        per_territory = max(1, reinforcements // len(targets))
+        for pos, fraction in distribution.items():
+            troops_to_place = round(reinforcements * fraction)
+            if troops_to_place > 0 and remaining > 0:
+                actual = min(troops_to_place, remaining)
+                allocated[pos] = actual
+                remaining -= actual
+
+        if remaining > 0:
+            best_pos = max(distribution.keys(), key=lambda p: distribution[p])
+            allocated[best_pos] = allocated.get(best_pos, 0) + remaining
         
-        for pos in targets:
-            if reinforcements <= 0:
-                break
-            amount = min(per_territory, reinforcements)
-            game_state.place_reinforcements(pos, amount)
-            reinforcements -= amount
-    
-    def _concentrate_reinforcements(self, game_state: GameState,
-                                    border_territories: List[Tuple[int, int]],
-                                    reinforcements: int) -> None:
-        if not border_territories:
-            territories = game_state.board.get_territories_for_player(self.player_id)
-            if not territories:
-                return
-            target = random.choice(territories)
-        else:
-            target = max(border_territories, 
-                        key=lambda pos: game_state.board.get(pos[0], pos[1]).troops)
-        
-        game_state.place_reinforcements(target, reinforcements)
-    
-    def _balanced_reinforcements(self, game_state: GameState, 
-                                 territories: List[Tuple[int, int]],
-                                 border_territories: List[Tuple[int, int]],
-                                 border_focus: float,
-                                 reinforcements: int) -> None:
-        border_amount = int(reinforcements * border_focus)
-        interior_amount = reinforcements - border_amount
-        
-        if border_territories and border_amount > 0:
-            weakest_border = min(border_territories,
-                               key=lambda pos: game_state.board.get(pos[0], pos[1]).troops)
-            game_state.place_reinforcements(weakest_border, border_amount)
-        
-        if interior_amount > 0:
-            interior = [t for t in territories if t not in border_territories]
-            if interior:
-                target = random.choice(interior)
-                game_state.place_reinforcements(target, interior_amount)
-            elif border_territories:
-                target = random.choice(border_territories)
-                game_state.place_reinforcements(target, interior_amount)
+        for pos, troops in allocated.items():
+            if troops > 0:
+                game_state.place_reinforcements(pos, troops)
     
     def _handle_action(self, game_state: GameState) -> None:
         max_actions = 10
@@ -110,7 +89,7 @@ class GeneticAgent:
         flanking_preference = self.genome.get_trait('flanking_preference')
         
         while actions_taken < max_actions:
-            if flanking_preference > 0.6 and random.random() < 0.4:
+            if random.random() < flanking_preference:
                 if self._attempt_flanking_attack(game_state):
                     actions_taken += 1
                     continue
@@ -132,9 +111,15 @@ class GeneticAgent:
         neutral_targets = [t for t in targets if game_state.board.get(t[0], t[1]).is_neutral]
         enemy_targets = [t for t in targets if not game_state.board.get(t[0], t[1]).is_neutral]
         
-        if neutral_priority > 0.6 and neutral_targets:
+        target_pool = []
+        if neutral_targets and enemy_targets:
+            if random.random() < neutral_priority:
+                target_pool = neutral_targets
+            else:
+                target_pool = enemy_targets
+        elif neutral_targets:
             target_pool = neutral_targets
-        elif neutral_priority < 0.4 and enemy_targets:
+        elif enemy_targets:
             target_pool = enemy_targets
         else:
             target_pool = targets
@@ -154,8 +139,17 @@ class GeneticAgent:
                 
                 force_ratio = available / max(1, target_territory.troops)
                 
-                if force_ratio >= (1.0 + attack_threshold):
-                    troops_to_send = int(available * (0.7 + risk_tolerance * 0.3))
+                min_ratio = 1.0 + attack_threshold * 2.0
+
+                if force_ratio >= min_ratio:
+                    attack_probability = 1.0
+                elif force_ratio >= 1.0:
+                    attack_probability = (force_ratio - 1.0) / (min_ratio - 1.0)
+                else:
+                    attack_probability = 0.0
+
+                if random.random() < attack_probability:
+                    troops_to_send = int(available * (0.5 + risk_tolerance * 0.5))
                     troops_to_send = max(1, min(troops_to_send, available))
                     
                     result = game_state.move_troops(attacker_pos, target, troops_to_send)

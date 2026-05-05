@@ -1,7 +1,4 @@
-from typing import Tuple
 from src.game.game_state import GameState, GameConfig
-from src.game.territory import Territory
-
 
 def setup_chokepoint_board(game_state: GameState, starting_troops: int = 15) -> None:
     size = game_state.config.board_size

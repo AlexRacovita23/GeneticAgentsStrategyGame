@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Optional
 import random
 
 from src.genetic.genome import Genome

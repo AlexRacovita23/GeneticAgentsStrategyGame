@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Optional
-from src.game.game_state import GameState, WinCondition
+from typing import List
+from src.game.game_state import GameState
 
 
 @dataclass
