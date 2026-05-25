@@ -1,0 +1,36 @@
+{
+  "genome": {
+    "generation": 48,
+    "trait_groups": {
+      "combat_aggression": {
+        "traits": {
+          "attack_threshold": 0.3846880194873372,
+          "risk_tolerance": 0.3725892722267792,
+          "defensive_posture": 0.4099780925567128
+        }
+      },
+      "expansion_strategy": {
+        "traits": {
+          "expansion_speed": 0.3839464237298555,
+          "neutral_priority": 0.5396596687740953,
+          "border_focus": 0.6886012283673186
+        }
+      },
+      "army_distribution": {
+        "traits": {
+          "concentration": 0.5334435455355891,
+          "flanking_preference": 0.6684180668196045,
+          "reinforcement_spread": 0.3233962485686255,
+          "retreat_threshold": 0.303628752361128
+        }
+      }
+    }
+  },
+  "fitness": {
+    "score": 12360.5,
+    "wins": 5,
+    "losses": 0,
+    "draws": 0
+  },
+  "generation": 79
+}

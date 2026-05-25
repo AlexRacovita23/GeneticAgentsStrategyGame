@@ -1,0 +1,1 @@
+GARRISON_TROOPS: int = 1

@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass, field
-from typing import Callable, List, Tuple
+from typing import List, Tuple
 
 from src.game.territory import Territory
 from src.game.board import MoveOutcome, MoveResult
@@ -19,7 +19,7 @@ class AttackSource:
     troops: int
 
 
-@dataclass 
+@dataclass
 class FlankingOutcome:
     result: MoveResult
     attacker_wins: bool
@@ -33,10 +33,14 @@ class FlankingOutcome:
     losses_per_source: List[int] = field(default_factory=list)
 
 
+def _calculate_power(troops: int, bonus: float) -> float:
+    return (troops ** 2) * bonus
+
+
 def get_flanking_bonus(num_directions: int, config: CombatConfig = None) -> float:
     if config is None:
         config = CombatConfig()
-    
+
     index = max(0, min(num_directions - 1, len(config.flanking_bonuses) - 1))
     return config.flanking_bonuses[index]
 
@@ -50,12 +54,12 @@ def resolve_combat_lanchester(
 ) -> MoveOutcome:
     if config is None:
         config = CombatConfig()
-    
+
     defenders = dest.troops
-    
+
     if attackers <= 0:
         return MoveOutcome(result=MoveResult.INVALID)
-    
+
     if defenders <= 0:
         dest.set_owner(source.owner, attackers)
         dest.troops_moved_this_turn = attackers
@@ -65,22 +69,22 @@ def resolve_combat_lanchester(
             troops_lost_attacker=0,
             troops_lost_defender=0,
         )
-    
+
     flanking_bonus = get_flanking_bonus(flanking_directions, config)
-    
-    atk_power = (attackers ** 2) * flanking_bonus
-    def_power = (defenders ** 2) * config.defender_bonus
-    
+
+    atk_power = _calculate_power(attackers, flanking_bonus)
+    def_power = _calculate_power(defenders, config.defender_bonus)
+
     if atk_power > def_power:
         power_diff = atk_power - def_power
         remaining = math.sqrt(power_diff / flanking_bonus)
         remaining = max(config.min_survivors, int(remaining))
-        
+
         troops_lost_attacker = attackers - remaining
-        
+
         dest.set_owner(source.owner, remaining)
         dest.troops_moved_this_turn = remaining
-        
+
         return MoveOutcome(
             result=MoveResult.CONQUERED,
             troops_moved=attackers,
@@ -91,11 +95,11 @@ def resolve_combat_lanchester(
         power_diff = def_power - atk_power
         remaining = math.sqrt(power_diff / config.defender_bonus)
         remaining = max(config.min_survivors, int(remaining))
-        
+
         troops_lost_defender = defenders - remaining
-        
+
         dest.troops = remaining
-        
+
         return MoveOutcome(
             result=MoveResult.REPELLED,
             troops_moved=attackers,
@@ -112,7 +116,7 @@ def resolve_flanked_combat(
 ) -> FlankingOutcome:
     if config is None:
         config = CombatConfig()
-    
+
     if not attacks:
         return FlankingOutcome(
             result=MoveResult.INVALID,
@@ -125,11 +129,11 @@ def resolve_flanked_combat(
             troops_lost_attacker=0,
             troops_lost_defender=0,
         )
-    
+
     total_attackers = sum(a.troops for a in attacks)
     num_directions = len(attacks)
     defenders = dest.troops
-    
+
     if total_attackers <= 0:
         return FlankingOutcome(
             result=MoveResult.INVALID,
@@ -142,7 +146,7 @@ def resolve_flanked_combat(
             troops_lost_attacker=0,
             troops_lost_defender=0,
         )
-    
+
     if defenders <= 0:
         dest.set_owner(attacker_owner, total_attackers)
         dest.troops_moved_this_turn = total_attackers
@@ -158,24 +162,24 @@ def resolve_flanked_combat(
             troops_lost_defender=0,
             losses_per_source=[0] * num_directions,
         )
-    
+
     flanking_bonus = get_flanking_bonus(num_directions, config)
-    
-    atk_power = (total_attackers ** 2) * flanking_bonus
-    def_power = (defenders ** 2) * config.defender_bonus
-    
+
+    atk_power = _calculate_power(total_attackers, flanking_bonus)
+    def_power = _calculate_power(defenders, config.defender_bonus)
+
     if atk_power > def_power:
         power_diff = atk_power - def_power
         remaining = math.sqrt(power_diff / flanking_bonus)
         remaining = max(config.min_survivors, int(remaining))
-        
+
         troops_lost = total_attackers - remaining
-        
+
         losses_per_source = _distribute_losses(attacks, troops_lost)
-        
+
         dest.set_owner(attacker_owner, remaining)
         dest.troops_moved_this_turn = remaining
-        
+
         return FlankingOutcome(
             result=MoveResult.CONQUERED,
             attacker_wins=True,
@@ -192,13 +196,13 @@ def resolve_flanked_combat(
         power_diff = def_power - atk_power
         remaining = math.sqrt(power_diff / config.defender_bonus)
         remaining = max(config.min_survivors, int(remaining))
-        
+
         troops_lost_defender = defenders - remaining
-        
+
         losses_per_source = [a.troops for a in attacks]
-        
+
         dest.troops = remaining
-        
+
         return FlankingOutcome(
             result=MoveResult.REPELLED,
             attacker_wins=False,
@@ -217,10 +221,10 @@ def _distribute_losses(attacks: List[AttackSource], total_losses: int) -> List[i
     total_troops = sum(a.troops for a in attacks)
     if total_troops == 0:
         return [0] * len(attacks)
-    
+
     losses = []
     remaining_losses = total_losses
-    
+
     for i, attack in enumerate(attacks):
         if i == len(attacks) - 1:
             losses.append(remaining_losses)
@@ -230,28 +234,15 @@ def _distribute_losses(attacks: List[AttackSource], total_losses: int) -> List[i
             this_loss = min(this_loss, remaining_losses)
             losses.append(this_loss)
             remaining_losses -= this_loss
-    
+
     return losses
 
 
-def create_combat_resolver(config: CombatConfig = None) -> Callable:
-    if config is None:
-        config = CombatConfig()
-    
-    def resolver(source: Territory, dest: Territory, attackers: int) -> MoveOutcome:
-        return resolve_combat_lanchester(source, dest, attackers, config)
-    
-    return resolver
-
-
-default_combat_resolver = create_combat_resolver()
-aggressive_combat_resolver = create_combat_resolver(CombatConfig(defender_bonus=1.0))
-defensive_combat_resolver = create_combat_resolver(CombatConfig(defender_bonus=1.5))
 
 
 def calculate_win_probability(
-    attackers: int, 
-    defenders: int, 
+    attackers: int,
+    defenders: int,
     defender_bonus: float = 1.2,
     flanking_directions: int = 1,
 ) -> float:
@@ -259,19 +250,19 @@ def calculate_win_probability(
         return 1.0
     if attackers <= 0:
         return 0.0
-    
+
     config = CombatConfig(defender_bonus=defender_bonus)
     flanking_bonus = get_flanking_bonus(flanking_directions, config)
-    
-    atk_power = (attackers ** 2) * flanking_bonus
-    def_power = (defenders ** 2) * defender_bonus
-    
+
+    atk_power = _calculate_power(attackers, flanking_bonus)
+    def_power = _calculate_power(defenders, defender_bonus)
+
     return 1.0 if atk_power > def_power else 0.0
 
 
 def calculate_remaining_troops(
-    attackers: int, 
-    defenders: int, 
+    attackers: int,
+    defenders: int,
     defender_bonus: float = 1.2,
     flanking_directions: int = 1,
 ) -> Tuple[bool, int]:
@@ -279,13 +270,13 @@ def calculate_remaining_troops(
         return True, attackers
     if attackers <= 0:
         return False, defenders
-    
+
     config = CombatConfig(defender_bonus=defender_bonus)
     flanking_bonus = get_flanking_bonus(flanking_directions, config)
-    
-    atk_power = (attackers ** 2) * flanking_bonus
-    def_power = (defenders ** 2) * defender_bonus
-    
+
+    atk_power = _calculate_power(attackers, flanking_bonus)
+    def_power = _calculate_power(defenders, defender_bonus)
+
     if atk_power > def_power:
         remaining = max(1, int(math.sqrt((atk_power - def_power) / flanking_bonus)))
         return True, remaining
@@ -295,16 +286,25 @@ def calculate_remaining_troops(
 
 
 def minimum_troops_to_win(
-    defenders: int, 
+    defenders: int,
     defender_bonus: float = 1.2,
     flanking_directions: int = 1,
 ) -> int:
     if defenders <= 0:
         return 1
-    
+
     config = CombatConfig(defender_bonus=defender_bonus)
     flanking_bonus = get_flanking_bonus(flanking_directions, config)
-    
+
     effective_ratio = defender_bonus / flanking_bonus
     min_attackers = defenders * math.sqrt(effective_ratio)
     return int(math.ceil(min_attackers)) + 1
+
+
+class CombatResolver:
+
+    def __init__(self, config: CombatConfig = None):
+        self.config = config or CombatConfig()
+
+    def resolve(self, source: Territory, dest: Territory, attackers: int) -> MoveOutcome:
+        return resolve_combat_lanchester(source, dest, attackers, self.config)
