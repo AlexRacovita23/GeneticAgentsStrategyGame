@@ -15,8 +15,8 @@ class ActionStrategy:
         self.genome = genome
 
     def redistribute_troops(self, game_state: GameState, player_id: int) -> int:
-        concentration   = self.genome.get_trait("concentration")
-        border_focus    = self.genome.get_trait("border_focus")
+        concentration        = self.genome.get_trait("concentration")
+        border_focus         = self.genome.get_trait("border_focus")
         reinforcement_spread = self.genome.get_trait("reinforcement_spread")
 
         territories = game_state.board.get_territories_for_player(player_id)
@@ -27,7 +27,16 @@ class ActionStrategy:
 
         weights: Dict[Tuple[int, int], float] = {}
         for pos in territories:
-            troops   = game_state.board.get(pos[0], pos[1]).troops
+            neighbors = game_state.board.get_neighbors(pos[0], pos[1])
+            is_frontier = any(
+                game_state.board.get(n[0], n[1]).owner != player_id
+                for n in neighbors
+            )
+            if is_frontier:
+                weights[pos] = 0.0
+                continue
+
+            troops    = game_state.board.get(pos[0], pos[1]).troops
             is_border = pos in border_set
 
             base_weight = border_focus if is_border else (1.0 - border_focus)
@@ -56,6 +65,7 @@ class ActionStrategy:
         total_moveable = sum(
             game_state.board.get(r, c).available_troops
             for r, c in territories
+            if weights.get((r, c), 0.0) > 0.0
         )
 
         target_troops: Dict[Tuple[int, int], float] = {
@@ -67,6 +77,8 @@ class ActionStrategy:
         deficit: List[Tuple[Tuple[int, int], float]] = []
 
         for pos in territories:
+            if weights.get(pos, 0.0) == 0.0:
+                continue
             available = game_state.board.get(pos[0], pos[1]).available_troops
             want      = target_troops[pos]
             diff      = available - want
@@ -129,8 +141,8 @@ class ActionStrategy:
         flanking_preference = self.genome.get_trait("flanking_preference")
         retreat_threshold = self.genome.get_trait("retreat_threshold")
 
-        self._execute_retreats(game_state, player_id, retreat_threshold)
-
+        if game_state.turn_number > 10:
+            self._execute_retreats(game_state, player_id, retreat_threshold)
         while True:
             did_something = False
 
@@ -255,7 +267,15 @@ class ActionStrategy:
         scored_targets.sort(key=lambda x: x[1], reverse=True)
 
         top_count = max(3, len(scored_targets) // 3)
-        return [target for target, _ in scored_targets[:top_count]]
+        strategic_targets = [target for target, _ in scored_targets[:top_count]]
+
+        free_targets = [
+            t for t in targets
+            if game_state.board.get(t[0], t[1]).troops == 0
+            and t not in strategic_targets
+        ]
+
+        return free_targets + strategic_targets
 
     def _execute_retreats(
         self,

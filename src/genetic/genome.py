@@ -56,7 +56,7 @@ class Genome:
         genome.trait_groups[TraitGroupType.COMBAT_AGGRESSION] = TraitGroup(
             group_type=TraitGroupType.COMBAT_AGGRESSION,
             traits={
-                "attack_threshold": random.uniform(0.3, 0.7),
+                "attack_threshold": random.uniform(0.1, 0.5),
                 "risk_tolerance": random.uniform(0.3, 0.7),
                 "defensive_posture": random.uniform(0.3, 0.7),
             },
@@ -108,20 +108,20 @@ class Genome:
     def _get_default_traits_for_group(group_type: TraitGroupType) -> Dict[str, float]:
         if group_type == TraitGroupType.COMBAT_AGGRESSION:
             return {
-                "attack_threshold": 0.5,
+                "attack_threshold": 0.3,
                 "risk_tolerance": 0.5,
                 "defensive_posture": 0.5,
             }
         elif group_type == TraitGroupType.EXPANSION_STRATEGY:
             return {
-                "expansion_speed": 0.5,
+                "expansion_speed": 0.3,
                 "neutral_priority": 0.5,
                 "border_focus": 0.5,
             }
         elif group_type == TraitGroupType.ARMY_DISTRIBUTION:
             return {
                 "concentration": 0.5,
-                "flanking_preference": 0.5,
+                "flanking_preference": 0.3,
                 "reinforcement_spread": 0.5,
                 "retreat_threshold": 0.5,
             }

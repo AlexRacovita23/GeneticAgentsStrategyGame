@@ -28,7 +28,7 @@ class FitnessEvaluator:
     def __init__(
         self,
         win_weight: float = 100.0,
-        territory_weight: float = 2.0,
+        territory_weight: float = 5.0,
         troop_weight: float = 0.5,
         turn_weight: float = 1.0,
     ):
@@ -42,6 +42,8 @@ class FitnessEvaluator:
 
         if game_state.winner == player_id:
             score += self.win_weight
+        elif game_state.winner is None:
+            score -= 20.0
 
         stats = game_state.get_player_stats(player_id)
         score += stats["territories"] * self.territory_weight

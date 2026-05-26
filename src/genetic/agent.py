@@ -35,5 +35,4 @@ class GeneticAgent:
 
     def _handle_action(self, game_state: GameState) -> None:
         self.action_strategy.redistribute_troops(game_state, self.player_id)
-
         self.action_strategy.execute_actions(game_state, self.player_id)

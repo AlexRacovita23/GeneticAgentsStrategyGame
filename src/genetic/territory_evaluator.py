@@ -89,8 +89,16 @@ class TerritoryEvaluator:
     ) -> float:
         target_territory = self.board.get(target[0], target[1])
 
+        # flat base score so free/neutral tiles are never buried near zero
+        if target_territory.troops == 0:
+            base_score = 2.0
+        elif target_territory.owner == -1:
+            base_score = 1.0
+        else:
+            base_score = 0.0
+
         score = self.score_territory(target, expansion_speed)
-        strategic_score = score.expansion_value
+        strategic_score = base_score + score.expansion_value
 
         if target_territory.owner == -1:
             strategic_score *= 1.2
@@ -99,6 +107,13 @@ class TerritoryEvaluator:
 
         troop_modifier = 1.0 / max(1, target_territory.troops * 0.5)
         strategic_score *= (1.0 + troop_modifier)
+
+        # bonus for tiles already adjacent to your territory (reachable and useful)
+        friendly_adjacent = sum(
+            1 for n in self.board.get_neighbors(target[0], target[1])
+            if self.board.get(n[0], n[1]).owner == self.player_id
+        )
+        strategic_score += friendly_adjacent * 0.5
 
         connectivity = get_territory_connectivity(self.board, self.player_id, target)
         strategic_score += connectivity * 0.1
