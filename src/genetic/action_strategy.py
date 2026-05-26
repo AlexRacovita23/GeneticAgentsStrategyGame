@@ -68,15 +68,6 @@ class ActionStrategy:
 
         weights: Dict[Tuple[int, int], float] = {}
         for pos in territories:
-            neighbors = game_state.board.get_neighbors(pos[0], pos[1])
-            is_frontier = any(
-                game_state.board.get(n[0], n[1]).owner != player_id
-                for n in neighbors
-            )
-            if is_frontier:
-                weights[pos] = 0.0
-                continue
-
             troops    = game_state.board.get(pos[0], pos[1]).troops
             is_border = pos in border_set
 
@@ -104,9 +95,8 @@ class ActionStrategy:
         }
 
         total_moveable = sum(
-            game_state.board.get(r, c).available_troops
+            game_state.board.get(r, c).troops
             for r, c in territories
-            if weights.get((r, c), 0.0) > 0.0
         )
 
         target_troops: Dict[Tuple[int, int], float] = {
@@ -190,9 +180,13 @@ class ActionStrategy:
         actions_taken = 0
         flanking_preference = self.genome.get_trait("flanking_preference")
         retreat_threshold   = self.genome.get_trait("retreat_threshold")
+        forward_aggression  = self.genome.get_trait("forward_aggression")
 
         if game_state.turn_number > 10:
             self._execute_retreats(game_state, player_id, retreat_threshold)
+
+        if game_state.turn_number > 5:
+            self._forward_deploy(game_state, player_id)
 
         while True:
             did_something = False
@@ -208,7 +202,13 @@ class ActionStrategy:
                 did_something = True
 
             if not did_something:
-                break
+                if random.random() < forward_aggression * 0.3:
+                    if self._attempt_breakout_attack(game_state, player_id):
+                        actions_taken += 1
+                        did_something = True
+
+                if not did_something:
+                    break
 
         return actions_taken
 
@@ -364,6 +364,123 @@ class ActionStrategy:
                     retreats_made += 1
 
         return retreats_made
+
+    def _forward_deploy(self, game_state: GameState, player_id: int) -> int:
+        forward_aggression = self.genome.get_trait("forward_aggression")
+
+        territories = game_state.board.get_territories_for_player(player_id)
+        if len(territories) < 2:
+            return 0
+
+        frontier_positions = []
+        interior_positions = []
+
+        for pos in territories:
+            neighbors = game_state.board.get_neighbors(pos[0], pos[1])
+            has_enemy_neighbor = any(
+                game_state.board.get(n[0], n[1]).owner != player_id
+                for n in neighbors
+            )
+
+            if has_enemy_neighbor:
+                frontier_positions.append(pos)
+            else:
+                interior_positions.append(pos)
+
+        if not frontier_positions or not interior_positions:
+            return 0
+
+        interior_positions.sort(
+            key=lambda p: game_state.board.get(p[0], p[1]).available_troops,
+            reverse=True
+        )
+
+        moves_made = 0
+
+        for interior_pos in interior_positions:
+            interior_tile = game_state.board.get(interior_pos[0], interior_pos[1])
+            available = interior_tile.available_troops
+
+            if available < 2:
+                continue
+
+            if random.random() > forward_aggression:
+                continue
+
+            frontier_positions.sort(
+                key=lambda p: game_state.board.get(p[0], p[1]).troops
+            )
+
+            for frontier_pos in frontier_positions:
+                next_step = _bfs_next_step(game_state, interior_pos, frontier_pos, player_id)
+                if next_step is None:
+                    continue
+
+                troops_to_move = max(1, int(available * forward_aggression))
+                result = game_state.move_troops(interior_pos, next_step, troops_to_move)
+
+                if result.result == MoveResult.REINFORCED:
+                    moves_made += 1
+                    break
+
+        return moves_made
+
+    def _attempt_breakout_attack(self, game_state: GameState, player_id: int) -> bool:
+        attack_threshold = self.genome.get_trait("attack_threshold")
+        forward_aggression = self.genome.get_trait("forward_aggression")
+
+        territories = game_state.board.get_territories_for_player(player_id)
+
+        stuck_territories = []
+        for pos in territories:
+            tile = game_state.board.get(pos[0], pos[1])
+            if tile.available_troops < 5:
+                continue
+
+            neighbors = game_state.board.get_neighbors(pos[0], pos[1])
+            has_friendly_exit = any(
+                game_state.board.get(n[0], n[1]).owner == player_id and
+                game_state.board.get(n[0], n[1]).available_troops < tile.available_troops * 0.5
+                for n in neighbors
+            )
+
+            if not has_friendly_exit:
+                stuck_territories.append(pos)
+
+        if not stuck_territories:
+            return False
+
+        stuck_territories.sort(
+            key=lambda p: game_state.board.get(p[0], p[1]).available_troops,
+            reverse=True
+        )
+
+        for pos in stuck_territories:
+            tile = game_state.board.get(pos[0], pos[1])
+            neighbors = game_state.board.get_neighbors(pos[0], pos[1])
+
+            enemy_neighbors = [
+                n for n in neighbors
+                if game_state.board.get(n[0], n[1]).owner != player_id
+            ]
+
+            if not enemy_neighbors:
+                continue
+
+            for target in enemy_neighbors:
+                target_tile = game_state.board.get(target[0], target[1])
+                force_ratio = tile.available_troops / max(1, target_tile.troops)
+
+                breakout_threshold = 0.5 + attack_threshold * 0.3
+
+                if force_ratio >= breakout_threshold and random.random() < forward_aggression:
+                    troops_to_send = max(1, int(tile.available_troops * 0.8))
+                    result = game_state.move_troops(pos, target, troops_to_send)
+
+                    if result.result in (MoveResult.CONQUERED, MoveResult.REPELLED):
+                        return True
+
+        return False
 
     @staticmethod
     def _attack_probability(

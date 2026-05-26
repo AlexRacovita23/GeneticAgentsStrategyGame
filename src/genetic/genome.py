@@ -76,6 +76,7 @@ class Genome:
                 "flanking_preference": random.uniform(0.3, 0.7),
                 "reinforcement_spread": random.uniform(0.3, 0.7),
                 "retreat_threshold": random.uniform(0.3, 0.7),
+                "forward_aggression": random.uniform(0.3, 0.7),
             },
         )
 
@@ -124,6 +125,7 @@ class Genome:
                 "flanking_preference": 0.3,
                 "reinforcement_spread": 0.5,
                 "retreat_threshold": 0.5,
+                "forward_aggression": 0.5,
             }
         return {}
 
