@@ -27,7 +27,8 @@ def train(generations: int = 100,
           games_per_eval: int = 5,
           save_every: int = 5,
           output_dir: str = "trained_genomes",
-          seed: int = None):
+          seed: int = None,
+          use_premade_opponents: bool = False):
     if seed is not None:
         import random
         random.seed(seed)
@@ -42,13 +43,6 @@ def train(generations: int = 100,
 
     print(f"\nTraining Session: {timestamp}")
     print(f"Output Directory: {session_dir}")
-    print(f"\nConfiguration:")
-    print(f"Generations: {generations}")
-    print(f"Population Size: {population_size}")
-    print(f"Games per Evaluation: {games_per_eval}")
-    print(f"Save Every: {save_every} generations\n")
-    if seed:
-        print(f"  Random Seed: {seed}")
 
     population = Population(
         population_size=population_size,
@@ -56,8 +50,19 @@ def train(generations: int = 100,
         tournament_size=3,
         mutation_rate=0.1,
         crossover_rate=0.7,
-        elitism=2
+        elitism=2,
+        use_premade_opponents=use_premade_opponents
     )
+
+    print(f"\nConfiguration:")
+    print(f"Generations: {generations}")
+    print(f"Population Size: {population_size}")
+    print(f"Games per Evaluation: {population.games_per_eval}")
+    print(f"Save Every: {save_every} generations")
+    print(f"Use Premade Opponents: {use_premade_opponents}")
+    print(f"Game Factory: {population.game_factory_name}\n")
+    if seed:
+        print(f"  Random Seed: {seed}")
     population.initialize_random()
 
     start_time = time.time()
@@ -153,6 +158,12 @@ def main():
         help='Random seed for reproducibility'
     )
 
+    parser.add_argument(
+        '--vs-premade',
+        action='store_true',
+        help='Train against premade genomes using 8x8 map (3 games per eval)'
+    )
+
     args = parser.parse_args()
 
     train(
@@ -161,7 +172,8 @@ def main():
         games_per_eval=args.games,
         save_every=args.save_every,
         output_dir=args.output,
-        seed=args.seed
+        seed=args.seed,
+        use_premade_opponents=args.vs_premade
     )
 
 if __name__ == '__main__':

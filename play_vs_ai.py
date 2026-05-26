@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.genetic.population import Population
 from src.genetic.agent import GeneticAgent
-from src.genetic.board_setup import create_chokepoint_game
+from src.genetic.board_setup import create_chokepoint_game, create_chokepoint_game_small
 from src.game.renderer import PygameRenderer
 from src.game.input_handler import InputHandler
 from src.game.game_controller import GameController
@@ -25,16 +25,20 @@ def list_trained_genomes(directory: str = "trained_genomes"):
         print(f"{genome_file}")
 
 
-def run_vs_ai(genome_path: str, human_player: int = 0):
+def run_vs_ai(genome_path: str, human_player: int = 0, use_small_map: bool = False):
     genome = Population.load_genome(genome_path)
 
     print(f"Loaded genome from: {genome_path}")
     print(f"You are Player {human_player}")
     print(f"AI is Player {1 - human_player}")
+    print(f"Map Size: {'8x8 (Small)' if use_small_map else '12x12 (Standard)'}")
     print(f"\nAI Genome Traits:")
     print(genome)
 
-    game = create_chokepoint_game(starting_troops=15, max_turns=300)
+    if use_small_map:
+        game = create_chokepoint_game_small(starting_troops=15, max_turns=300)
+    else:
+        game = create_chokepoint_game(starting_troops=15, max_turns=300)
 
     ai_player = 1 - human_player
     ai_agent = GeneticAgent(genome, ai_player)
@@ -127,6 +131,12 @@ Examples:
         help='List available trained genomes and exit'
     )
 
+    parser.add_argument(
+        '--small-map',
+        action='store_true',
+        help='Use 8x8 chokepoint map instead of 12x12'
+    )
+
     args = parser.parse_args()
 
     if args.list:
@@ -139,7 +149,7 @@ Examples:
         print("\nUse --list to see available trained genomes")
         return
 
-    run_vs_ai(genome_path, args.player)
+    run_vs_ai(genome_path, args.player, args.small_map)
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ from typing import Callable, List, Optional, Tuple
 from src.game.game_loop import GameLoop
 from src.game.game_state import GameState
 from src.genetic.agent import GeneticAgent
-from src.genetic.board_setup import create_chokepoint_game
+from src.genetic.board_setup import create_chokepoint_game, create_chokepoint_game_small
 from src.genetic.fitness import FitnessEvaluator, FitnessResult
 from src.genetic.genome import Genome
 
@@ -46,6 +46,8 @@ def _play_game(genome1: Genome, genome2: Genome, game_factory: Callable) -> Game
 def _resolve_factory(name: str) -> Callable:
     if name == "chokepoint":
         return create_chokepoint_game
+    if name == "chokepoint_small":
+        return create_chokepoint_game_small
     raise ValueError(f"Unknown game factory: {name!r}")
 
 @dataclass
@@ -72,6 +74,7 @@ class Population:
         game_factory_name: str = "chokepoint",
         evaluator: Optional[FitnessEvaluator] = None,
         num_workers: Optional[int] = None,
+        use_premade_opponents: bool = False,
     ):
         self.population_size  = population_size
         self.games_per_eval   = games_per_eval
@@ -79,8 +82,18 @@ class Population:
         self.mutation_rate    = mutation_rate
         self.crossover_rate   = crossover_rate
         self.elitism          = elitism
-        self.game_factory     = game_factory or create_chokepoint_game
-        self.game_factory_name = game_factory_name
+        self.use_premade_opponents = use_premade_opponents
+
+        if use_premade_opponents:
+            self.game_factory_name = "chokepoint_small"
+            self.game_factory = create_chokepoint_game_small
+            self.games_per_eval = 3
+            self.premade_genome_dicts = self._load_premade_genomes()
+        else:
+            self.game_factory = game_factory or create_chokepoint_game
+            self.game_factory_name = game_factory_name
+            self.premade_genome_dicts = []
+
         self.evaluator        = evaluator or FitnessEvaluator()
         self.num_workers      = num_workers or min(mp.cpu_count(), population_size)
 
@@ -94,6 +107,20 @@ class Population:
             "troop_weight":     self.evaluator.troop_weight,
             "turn_weight":      self.evaluator.turn_weight,
         }
+
+    def _load_premade_genomes(self) -> List[dict]:
+        from pathlib import Path
+        premade_dir = Path("premade_genomes")
+        genome_files = ["aggressive_rusher.json", "defensive_turtle.json", "neutral_hunter.json"]
+
+        genomes = []
+        for filename in genome_files:
+            filepath = premade_dir / filename
+            with open(filepath, "r") as f:
+                data = json.load(f)
+                genomes.append(data["genome"])
+
+        return genomes
 
     def initialize_random(self) -> None:
         self.population = [
@@ -140,11 +167,14 @@ class Population:
         all_dicts = [ind.genome.to_dict() for ind in self.population]
 
         for i in range(len(self.population)):
-            opponent_indices = random.sample(
-                [j for j in range(len(self.population)) if j != i],
-                min(self.games_per_eval, len(self.population) - 1),
-            )
-            opp_dicts = [all_dicts[j] for j in opponent_indices]
+            if self.use_premade_opponents:
+                opp_dicts = self.premade_genome_dicts
+            else:
+                opponent_indices = random.sample(
+                    [j for j in range(len(self.population)) if j != i],
+                    min(self.games_per_eval, len(self.population) - 1),
+                )
+                opp_dicts = [all_dicts[j] for j in opponent_indices]
 
             items.append((
                 i,
