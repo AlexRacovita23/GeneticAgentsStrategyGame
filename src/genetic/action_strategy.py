@@ -1,5 +1,6 @@
 import random
-from typing import List, Tuple, Dict
+from collections import deque
+from typing import Dict, List, Optional, Tuple
 
 from src.game import board_info
 from src.game.board import MoveResult
@@ -7,6 +8,46 @@ from src.game.combat import minimum_troops_to_win
 from src.game.game_state import GameState
 from src.genetic.genome import Genome
 from src.genetic.territory_evaluator import TerritoryEvaluator
+
+
+def _bfs_next_step(
+    game_state: GameState,
+    src: Tuple[int, int],
+    dst: Tuple[int, int],
+    player_id: int,
+) -> Optional[Tuple[int, int]]:
+    if src == dst:
+        return None
+
+    board = game_state.board
+    visited: Dict[Tuple[int, int], Optional[Tuple[int, int]]] = {src: None}
+    queue: deque = deque([src])
+
+    while queue:
+        current = queue.popleft()
+
+        for neighbor in board.get_neighbors(current[0], current[1]):
+            if neighbor in visited:
+                continue
+
+            neighbor_tile = board.get(neighbor[0], neighbor[1])
+            is_friendly = neighbor_tile.owner == player_id
+            is_goal = neighbor == dst
+
+            if not is_friendly and not is_goal:
+                continue
+
+            visited[neighbor] = current
+
+            if is_goal:
+                step = neighbor
+                while visited[step] != src:
+                    step = visited[step]  # type: ignore[assignment]
+                return step
+
+            queue.append(neighbor)
+
+    return None
 
 
 class ActionStrategy:
@@ -73,15 +114,20 @@ class ActionStrategy:
             for pos in territories
         }
 
+        available_now: Dict[Tuple[int, int], int] = {
+            pos: game_state.board.get(pos[0], pos[1]).available_troops
+            for pos in territories
+        }
+
         surplus: List[Tuple[Tuple[int, int], int]] = []
         deficit: List[Tuple[Tuple[int, int], float]] = []
 
         for pos in territories:
             if weights.get(pos, 0.0) == 0.0:
                 continue
-            available = game_state.board.get(pos[0], pos[1]).available_troops
-            want      = target_troops[pos]
-            diff      = available - want
+            avail = available_now[pos]
+            want  = target_troops[pos]
+            diff  = avail - want
             if diff > 1:
                 surplus.append((pos, int(diff)))
             elif diff < -1:
@@ -100,37 +146,41 @@ class ActionStrategy:
                 break
 
             remaining_need = int(def_want)
+            consumed: List[int] = []
 
-            while remaining_need > 0 and surplus:
-                src_pos, src_available = surplus[0]
+            for s_idx, (src_pos, src_available) in enumerate(surplus):
+                if remaining_need <= 0:
+                    break
+                if src_available <= 0:
+                    consumed.append(s_idx)
+                    continue
 
-                if not game_state.board.are_adjacent(src_pos, def_pos):
-                    adjacent_surplus = [
-                        (i, (p, a))
-                        for i, (p, a) in enumerate(surplus)
-                        if game_state.board.are_adjacent(p, def_pos)
-                    ]
-                    if not adjacent_surplus:
-                        break
-                    adj_i, (src_pos, src_available) = adjacent_surplus[0]
-                    surplus.pop(adj_i)
-                else:
-                    surplus.pop(0)
-                    src_available = src_available
+                next_step = _bfs_next_step(game_state, src_pos, def_pos, player_id)
+                if next_step is None:
+                    continue
 
                 to_move = min(remaining_need, src_available)
                 if to_move <= 0:
                     continue
 
-                outcome = game_state.move_troops(src_pos, def_pos, to_move)
+                outcome = game_state.move_troops(src_pos, next_step, to_move)
+
                 if outcome.result == MoveResult.REINFORCED:
                     moves_made += 1
                     remaining_need -= to_move
 
-                    new_available = game_state.board.get(src_pos[0], src_pos[1]).available_troops
-                    still_over = new_available - int(target_troops[src_pos])
-                    if still_over > 1:
-                        surplus.insert(0, (src_pos, still_over))
+                    available_now[src_pos] -= to_move
+                    new_surplus = available_now[src_pos] - int(target_troops.get(src_pos, 0))
+
+                    if new_surplus > 1:
+                        surplus[s_idx] = (src_pos, new_surplus)
+                    else:
+                        consumed.append(s_idx)
+
+                    available_now[next_step] = available_now.get(next_step, 0) + to_move
+
+            for i in sorted(set(consumed), reverse=True):
+                surplus.pop(i)
 
         return moves_made
 
@@ -139,10 +189,11 @@ class ActionStrategy:
     ) -> int:
         actions_taken = 0
         flanking_preference = self.genome.get_trait("flanking_preference")
-        retreat_threshold = self.genome.get_trait("retreat_threshold")
+        retreat_threshold   = self.genome.get_trait("retreat_threshold")
 
         if game_state.turn_number > 10:
             self._execute_retreats(game_state, player_id, retreat_threshold)
+
         while True:
             did_something = False
 
